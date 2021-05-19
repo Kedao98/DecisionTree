@@ -3,67 +3,26 @@ from collections import Counter
 import numpy as np
 import operator
 import matplotlib.pyplot as plt
+import pickle
 
 def createDataSet():
-    dataSet = [[0, 0, 0, 0, 'no'],                        #数据集
-            [0, 0, 0, 1, 'no'],
-            [0, 1, 0, 1, 'yes'],
-            [0, 1, 1, 0, 'yes'],
-            [0, 0, 0, 0, 'no'],
-            [1, 0, 0, 0, 'no'],
-            [1, 0, 0, 1, 'no'],
-            [1, 1, 1, 1, 'yes'],
-            [1, 0, 1, 2, 'yes'],
-            [1, 0, 1, 2, 'yes'],
-            [2, 0, 1, 2, 'yes'],
-            [2, 0, 1, 1, 'yes'],
-            [2, 1, 0, 1, 'yes'],
-            [2, 1, 0, 2, 'yes'],
-            [2, 0, 0, 0, 'no']]
-    featureNames = ['age', 'woring', 'ownHouse', 'Credition']            #分类属性
+    dataSet = [[0, 0, 0, 0, 'no'],  # 数据集
+               [0, 0, 0, 1, 'no'],
+               [0, 1, 0, 1, 'yes'],
+               [0, 1, 1, 0, 'yes'],
+               [0, 0, 0, 0, 'no'],
+               [1, 0, 0, 0, 'no'],
+               [1, 0, 0, 1, 'no'],
+               [1, 1, 1, 1, 'yes'],
+               [1, 0, 1, 2, 'yes'],
+               [1, 0, 1, 2, 'yes'],
+               [2, 0, 1, 2, 'yes'],
+               [2, 0, 1, 1, 'yes'],
+               [2, 1, 0, 1, 'yes'],
+               [2, 1, 0, 2, 'yes'],
+               [2, 0, 0, 0, 'no']]
+    featureNames = ['age', 'working', 'ownHouse', 'Credition']  # 分类属性
     return dataSet, featureNames
-
-def dataSetSplit(dataSet, targetFeatureIndex, targetFeatureValue):
-    splitedData = list()
-    for row in dataSet:
-        if row[targetFeatureIndex] == int(targetFeatureValue):
-            temp = row[:targetFeatureIndex]
-            temp.extend(row[targetFeatureIndex+1:])
-            splitedData.append(temp)
-    return splitedData
-
-def chooseBestFeature(dataSet):
-    def calcShannonEntropy(dataSet):
-        dataSize = len(dataSet)
-        labelCount = dict()
-        for data in dataSet:
-            if data[-1] not in labelCount.keys():  # label is the last col
-                labelCount[data[-1]] = 0
-            labelCount[data[-1]] += 1
-
-        ShannonEntropy = 0.0
-        for k in labelCount.keys():
-            p = labelCount[k] / dataSize
-            ShannonEntropy += -p * log(p, 2)
-
-        return ShannonEntropy
-
-    def calcConditionalEntropy(dataSet, featureIndexs):
-
-        classCount = Counter(np.array(dataSet[:])[:, featureIndexs])
-        dataSize = len(dataSet)
-        conditionalEntropy = 0.0
-        for feature in classCount.keys():
-            newDataSet = dataSetSplit(dataSet, targetFeatureIndex=featureIndexs, targetFeatureValue=feature)
-            conditionalEntropy += (classCount[feature] / dataSize) * calcShannonEntropy(newDataSet)
-        return conditionalEntropy
-
-    InfoGainList = list()
-    for i in range(len(dataSet[0])-1):
-        InfoGain = calcShannonEntropy(dataSet)-calcConditionalEntropy(dataSet,i)
-        InfoGainList.append(InfoGain)
-
-    return InfoGainList.index(max(InfoGainList)),max(InfoGainList)
 
 def createPlot(inTree):
     def getNumLeafs(myTree):
@@ -133,7 +92,48 @@ def createPlot(inTree):
     plotTree(inTree, (0.5, 1.0), '')  # 绘制决策树
     plt.show()  # 显示绘制结果
 
-def ID3(dataSet,featureNames,epslion=0.0):
+def ID3(dataSet,featureNames,testDataOrder,epslion=0.0):
+    def chooseBestFeature(dataSet):
+        def calcShannonEntropy(dataSet):
+            dataSize = len(dataSet)
+            labelCount = dict()
+            for data in dataSet:
+                if data[-1] not in labelCount.keys():  # label is the last col
+                    labelCount[data[-1]] = 0
+                labelCount[data[-1]] += 1
+
+            ShannonEntropy = 0.0
+            for k in labelCount.keys():
+                p = labelCount[k] / dataSize
+                ShannonEntropy += -p * log(p, 2)
+
+            return ShannonEntropy
+
+        def calcConditionalEntropy(dataSet, featureIndexs):
+
+            classCount = Counter(np.array(dataSet[:])[:, featureIndexs])
+            dataSize = len(dataSet)
+            conditionalEntropy = 0.0
+            for feature in classCount.keys():
+                newDataSet = dataSetSplit(dataSet, targetFeatureIndex=featureIndexs, targetFeatureValue=feature)
+                conditionalEntropy += (classCount[feature] / dataSize) * calcShannonEntropy(newDataSet)
+            return conditionalEntropy
+
+        InfoGainList = list()
+        for i in range(len(dataSet[0]) - 1):
+            InfoGain = calcShannonEntropy(dataSet) - calcConditionalEntropy(dataSet, i)
+            InfoGainList.append(InfoGain)
+
+        return InfoGainList.index(max(InfoGainList)), max(InfoGainList)
+
+    def dataSetSplit(dataSet, targetFeatureIndex, targetFeatureValue):
+        splitedData = list()
+        for row in dataSet:
+            if row[targetFeatureIndex] == int(targetFeatureValue):
+                temp = row[:targetFeatureIndex]
+                temp.extend(row[targetFeatureIndex + 1:])
+                splitedData.append(temp)
+        return splitedData
     #STEP 1
     classList = [example[-1] for example in dataSet]
     if classList.count(classList[0]) == len(classList):#if all cases have the same label return it
@@ -149,6 +149,7 @@ def ID3(dataSet,featureNames,epslion=0.0):
     # STEP 3
     bestFeatureIndex, InfoGain = chooseBestFeature(dataSet)
     bestFeature = featureNames[bestFeatureIndex]
+    testDataOrder.append(bestFeature)
     # STEP 4
     if InfoGain < epslion:
         classCount = Counter(classList)
@@ -160,12 +161,37 @@ def ID3(dataSet,featureNames,epslion=0.0):
 
     for value in featureValues:
         subDataSet = dataSetSplit(dataSet,bestFeatureIndex,value)
-        decisionTree[bestFeature][value] = ID3(subDataSet,featureNames[:])
+        decisionTree[bestFeature][value] = ID3(subDataSet,featureNames[:],testDataOrder)
 
     return decisionTree
 
+def classify(inputTree, featLabels, testVec):
+    firstStr = next(iter(inputTree))                                                        #获取决策树结点
+    secondDict = inputTree[firstStr]                                                        #下一个字典
+    featIndex = featLabels.index(firstStr)
+    for key in secondDict.keys():
+        if testVec[featIndex] == key:
+            if type(secondDict[key]).__name__ == 'dict':
+                classLabel = classify(secondDict[key], featLabels, testVec)
+            else: classLabel = secondDict[key]
+    return classLabel
 
-dataSet,featureNames = createDataSet()
-myTree = ID3(dataSet,featureNames)
+def storeTree(myTree,dirt):
+    with open(dirt,'wb') as fw:
+        pickle.dump(myTree,fw)
+def loadTree(dirt):
+    fr = open(dirt,'rb')
+    return pickle.load(fr)
+
+
+# dataSet,featureNames = createDataSet()
+# testDataOrder = list()
+# myTree = ID3(dataSet,featureNames,testDataOrder)
+# storeTree(myTree,r'classifierStorage.txt')
+
+myTree = loadTree(r'classifierStorage.txt')
 print(myTree)
-createPlot(myTree)
+
+# testData = [0,1]
+# res = classify(myTree,testDataOrder,testData)
+# print(res)
